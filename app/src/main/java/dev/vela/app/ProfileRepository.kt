@@ -85,10 +85,15 @@ class ProfileRepository(private val root: File) {
     fun create(name: String): Profile {
         root.mkdirs()
         val trimmed = name.trim().ifEmpty { "Profile" }
+        val current = readIndex() ?: Index(list(), null)
+        // Ordering must not depend on the clock: two profiles created in the same
+        // millisecond would otherwise sort arbitrarily. Each new profile is at
+        // least one tick later than the newest existing one.
+        val newest = current.profiles.maxOfOrNull { it.createdAt } ?: 0L
         val profile = Profile(
             id = UUID.randomUUID().toString().take(8),
             name = trimmed,
-            createdAt = System.currentTimeMillis(),
+            createdAt = maxOf(System.currentTimeMillis(), newest + 1),
         )
         profileDir(profile.id).mkdirs()
         packsDir(profile.id).mkdirs()
@@ -96,7 +101,6 @@ class ProfileRepository(private val root: File) {
         worldsDir(profile.id).mkdirs()
         settingsFile(profile.id).writeText("{\n  \"renderScale\": \"auto\"\n}\n")
 
-        val current = readIndex() ?: Index(list(), null)
         val updated = Index(current.profiles + profile, current.activeId ?: profile.id)
         writeIndex(updated)
         return profile
