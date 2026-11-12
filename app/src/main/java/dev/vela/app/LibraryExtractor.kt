@@ -4,7 +4,7 @@ import java.io.File
 import java.util.zip.ZipFile
 
 /**
- * Extracts `lib/<abi>/*.so` from an imported APK.
+ * Extracts every shared object under lib/<abi>/ from an imported APK.
  *
  * Every library the APK ships for that ABI is taken. A curated list is how a
  * dependency goes missing later and produces a `dlopen` error naming a different
