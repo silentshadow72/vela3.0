@@ -76,8 +76,9 @@ class LibraryExtractorTest {
                 "lib/armeabi-v7a/libminecraftpe.so" to 10,
             )
         )
+        // Sorted, so "arm64" comes before "armeabi": '6' sorts before 'e'.
         assertEquals(
-            listOf("armeabi-v7a", "arm64-v8a"),
+            listOf("arm64-v8a", "armeabi-v7a"),
             LibraryExtractor.availableAbis(apk),
         )
     }
