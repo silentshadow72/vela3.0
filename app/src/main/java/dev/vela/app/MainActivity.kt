@@ -9,6 +9,10 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -193,16 +197,26 @@ private fun VersionsScreen() {
                 Toast.makeText(context, "Log copied", Toast.LENGTH_SHORT).show()
             }) { Text("Copy", color = Amber) }
         }
+        // A log longer than the screen used to be clipped with no way to reach
+        // the end of it, which is where the RESULT line is. Fixed maximum height,
+        // scrollable inside, and the text can be selected as well as copied.
         Box(
             Modifier.fillMaxWidth().padding(top = 6.dp)
-                .background(Surface, RoundedCornerShape(10.dp)).padding(12.dp),
+                .heightIn(max = 320.dp)
+                .background(Surface, RoundedCornerShape(10.dp)),
         ) {
-            Text(
-                log,
-                color = Text,
-                fontSize = 11.sp,
-                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
-            )
+            Column(
+                Modifier.verticalScroll(rememberScrollState()).padding(12.dp),
+            ) {
+                SelectionContainer {
+                    Text(
+                        log,
+                        color = Text,
+                        fontSize = 11.sp,
+                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                    )
+                }
+            }
         }
     }
 
