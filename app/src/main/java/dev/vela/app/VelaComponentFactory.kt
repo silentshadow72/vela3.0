@@ -4,7 +4,6 @@ import android.app.Activity
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.util.Log
-import android.app.AppComponentFactory
 import java.io.File
 
 /**
@@ -24,7 +23,7 @@ import java.io.File
  * Every step is a Reason stage before the call, so a native abort leaves a line
  * with conclusion pending naming the call it died in.
  */
-class VelaComponentFactory : AppComponentFactory() {
+class VelaComponentFactory : androidx.core.app.CoreComponentFactory() {
 
     override fun instantiateActivity(
         cl: ClassLoader,
