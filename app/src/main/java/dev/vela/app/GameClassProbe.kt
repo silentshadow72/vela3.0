@@ -86,7 +86,7 @@ object GameClassProbe {
                 val clazz = Class.forName(ACTIVITY_CLASS, false, loader)
                 BoundaryLog.line(filesDir, "route 1: class found: ${clazz.name}")
                 BoundaryLog.line(filesDir, "route 1: loaded by ${clazz.classLoader?.javaClass?.name}")
-                return finish(filesDir, clazz)
+                return finish(filesDir, clazz, loader)
             } catch (t: Throwable) {
                 BoundaryLog.line(filesDir, "route 1: could not load the class: ${t.javaClass.name}: ${t.message}")
             }
@@ -127,45 +127,59 @@ object GameClassProbe {
         }
 
         BoundaryLog.line(filesDir, "route 2: class found: ${clazz.name}")
-        return finish(filesDir, clazz)
+        return finish(filesDir, clazz, loader)
     }
 
-    /** Records what the class is and whether it can be instantiated. */
-    private fun finish(filesDir: File, clazz: Class<*>): BoundaryProbe.Outcome {
+    /**
+     * Records what the class is, then forces initialisation and nothing more.
+     *
+     * Instantiating an Activity was the previous step and it killed the process,
+     * so this separates the two possibilities: a Java-level failure, which can be
+     * caught and printed with its cause chain, or a native abort, which cannot be
+     * caught at all. If the process dies here with no exception logged, the last
+     * flushed line says which stage it died in and the answer is native.
+     */
+    private fun finish(filesDir: File, clazz: Class<*>, loader: ClassLoader): BoundaryProbe.Outcome {
         BoundaryLog.line(filesDir, "")
         BoundaryLog.line(filesDir, "class: ${clazz.name}")
         BoundaryLog.line(filesDir, "superclass: ${clazz.superclass?.name}")
         BoundaryLog.line(filesDir, "loaded by: ${clazz.classLoader?.javaClass?.name}")
         BoundaryLog.line(filesDir, "is an Activity: ${android.app.Activity::class.java.isAssignableFrom(clazz)}")
+        BoundaryLog.line(
+            filesDir,
+            "constructors: " + clazz.declaredConstructors.joinToString { c ->
+                c.parameterTypes.joinToString(",", "(", ")") { it.simpleName }
+            },
+        )
+        BoundaryLog.line(filesDir, "static initialisers have NOT run yet (loaded with initialise = false)")
 
-        BoundaryLog.line(filesDir, "constructors: " + clazz.declaredConstructors.joinToString { c ->
-            c.parameterTypes.joinToString(",", "(", ")") { it.simpleName }
-        })
+        // Flushed before the call, so a native abort leaves this as the last line.
+        BoundaryLog.line(filesDir, "stage: about to initialise the class")
+        BoundaryLog.line(filesDir, "stage: Class.forName(initialise = true) on ${loader.javaClass.name}")
 
-        // Static initialisers have not run yet, because the class was loaded with
-        // initialise = false. Instantiating runs them, which is the point: it is
-        // the first thing that can fail for a reason that is not about loading.
-        BoundaryLog.line(filesDir, "about to instantiate (static initialisers run here)")
         return try {
-            val ctor = clazz.getDeclaredConstructor()
-            ctor.isAccessible = true
-            val instance = ctor.newInstance()
-            BoundaryLog.line(filesDir, "instantiated: ${instance.javaClass.name}")
-            BoundaryLog.line(filesDir, "RESULT: OK - the game's Activity class is obtainable and instantiable")
+            val initialised = Class.forName(ACTIVITY_CLASS, true, loader)
+            BoundaryLog.line(filesDir, "initialisation returned: ${initialised.name}")
+            BoundaryLog.line(filesDir, "RESULT: OK - the class loads and initialises")
             BoundaryProbe.Outcome(true, BoundaryLog.read(filesDir))
         } catch (t: Throwable) {
-            BoundaryLog.line(filesDir, "instantiation threw ${t.javaClass.name}: ${t.message}")
+            BoundaryLog.line(filesDir, "initialisation threw: ${t.javaClass.name}")
+            BoundaryLog.line(filesDir, "message: ${t.message}")
             var cause = t.cause
             var depth = 0
-            while (cause != null && depth < 6) {
-                BoundaryLog.line(filesDir, "caused by: ${cause.javaClass.simpleName}: ${cause.message}")
+            while (cause != null && depth < 10) {
+                BoundaryLog.line(
+                    filesDir,
+                    "caused by [$depth]: ${cause.javaClass.name}: ${cause.message}",
+                )
                 cause = cause.cause
                 depth++
             }
-            t.stackTrace.take(14).forEach { BoundaryLog.line(filesDir, "  at $it") }
+            BoundaryLog.line(filesDir, "stack:")
+            t.stackTrace.take(20).forEach { BoundaryLog.line(filesDir, "  at $it") }
             BoundaryLog.line(
                 filesDir,
-                "RESULT: PARTIAL - the class loads but does not instantiate; see the throw above",
+                "RESULT: FAIL - initialisation threw at the Java level, see the chain above",
             )
             BoundaryProbe.Outcome(false, BoundaryLog.read(filesDir))
         }
