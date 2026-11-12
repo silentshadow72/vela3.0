@@ -16,6 +16,7 @@ class VelaApplication : Application() {
     override fun onCreate() {
         super.onCreate()
 
+        ReasonFiles.set(this)
         Reason.configure(BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE)
 
         val filesDir = filesDir

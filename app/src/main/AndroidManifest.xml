@@ -9,6 +9,7 @@
 
     <application
         android:name=".VelaApplication"
+        android:appComponentFactory=".VelaComponentFactory"
         android:allowBackup="false"
         android:label="Vela"
         android:supportsRtl="true"

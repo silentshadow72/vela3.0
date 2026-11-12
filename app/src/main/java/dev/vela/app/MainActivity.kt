@@ -180,6 +180,41 @@ private fun VersionsScreen() {
 
     Spacer(Modifier.height(8.dp))
     OutlinedButton(
+        onClick = {
+            // Starts the component declared in our manifest. Android asks
+            // VelaComponentFactory for it, and the factory hands back the game's
+            // own Activity class.
+            Reason.stage(
+                context.filesDir,
+                question = "does Android create the declared game Activity?",
+                attempt = "startActivity(ComponentName(ourPackage, com.mojang.minecraftpe.MainActivity))",
+            )
+            val intent = android.content.Intent().apply {
+                component = android.content.ComponentName(
+                    context.packageName,
+                    "com.mojang.minecraftpe.MainActivity",
+                )
+            }
+            try {
+                context.startActivity(intent)
+                status = "asked Android to create the game Activity - watch the Logs tab"
+            } catch (t: Throwable) {
+                Reason.result(
+                    context.filesDir,
+                    question = "does Android create the declared game Activity?",
+                    attempt = "startActivity(...)",
+                    observation = "${t.javaClass.name}: ${t.message}",
+                    conclusion = "no - the start itself was refused",
+                )
+                status = "could not start it: ${t.message}"
+            }
+        },
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(10.dp),
+    ) { Text("Host the game Activity", color = Amber) }
+
+    Spacer(Modifier.height(8.dp))
+    OutlinedButton(
         enabled = !running,
         onClick = {
             running = true
