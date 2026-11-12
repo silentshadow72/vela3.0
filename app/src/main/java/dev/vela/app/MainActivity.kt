@@ -175,6 +175,23 @@ private fun VersionsScreen() {
         shape = RoundedCornerShape(10.dp),
     ) { Text(if (running) "Running..." else "Run boundary check (installed game)", color = Amber) }
 
+    Spacer(Modifier.height(8.dp))
+    OutlinedButton(
+        enabled = !running,
+        onClick = {
+            running = true
+            log = "loading the game library..."
+            val pm = context.packageManager
+            Thread {
+                BoundaryProbe.runGameLibraryProbe(context.filesDir, pm)
+                log = BoundaryLog.read(context.filesDir)
+                running = false
+            }.start()
+        },
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(10.dp),
+    ) { Text(if (running) "Running..." else "Probe: load libminecraftpe.so", color = Amber) }
+
     if (status.isNotEmpty()) {
         Spacer(Modifier.height(8.dp))
         Text(status, color = Muted, fontSize = 13.sp)
