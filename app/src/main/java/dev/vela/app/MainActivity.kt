@@ -180,17 +180,17 @@ private fun VersionsScreen() {
         enabled = !running,
         onClick = {
             running = true
-            log = "loading the game library..."
+            log = "obtaining the game class..."
             val pm = context.packageManager
             Thread {
-                BoundaryProbe.runGameLibraryProbe(context.filesDir, pm)
+                GameClassProbe.run(context.filesDir, context)
                 log = BoundaryLog.read(context.filesDir)
                 running = false
             }.start()
         },
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(10.dp),
-    ) { Text(if (running) "Running..." else "Probe: load libminecraftpe.so", color = Amber) }
+    ) { Text(if (running) "Running..." else "Probe: obtain the game's Activity class", color = Amber) }
 
     if (status.isNotEmpty()) {
         Spacer(Modifier.height(8.dp))

@@ -13,6 +13,14 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.Vela">
 
+        <!-- Declared, not started by the system: Android needs a component to
+             host, and this is the name the game uses. The class itself comes from
+             the installed APK, not from this one. -->
+        <activity
+            android:name="com.mojang.minecraftpe.MainActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
+
         <activity
             android:name=".MainActivity"
             android:exported="true"
