@@ -123,6 +123,8 @@ private fun VersionsScreen() {
     val context = LocalContext.current
     var versions by remember { mutableStateOf(VersionStore.all(context)) }
     var status by remember { mutableStateOf("") }
+    var log by remember { mutableStateOf(BoundaryLog.read(context.filesDir)) }
+    var running by remember { mutableStateOf(false) }
 
     val pickApk = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument()
@@ -155,6 +157,22 @@ private fun VersionsScreen() {
         Text(status, color = Muted, fontSize = 13.sp)
     }
 
+    if (log.isNotEmpty()) {
+        Spacer(Modifier.height(12.dp))
+        Text("Boundary log", color = Amber, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+        Box(
+            Modifier.fillMaxWidth().padding(top = 6.dp)
+                .background(Surface, RoundedCornerShape(10.dp)).padding(12.dp),
+        ) {
+            Text(
+                log,
+                color = Text,
+                fontSize = 11.sp,
+                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+            )
+        }
+    }
+
     Spacer(Modifier.height(16.dp))
 
     if (versions.isEmpty()) {
@@ -183,10 +201,26 @@ private fun VersionsScreen() {
                             fontSize = 13.sp,
                         )
                     }
-                    TextButton(onClick = {
-                        VersionStore.delete(context, version.id)
-                        versions = VersionStore.all(context)
-                    }) { Text("Remove", color = Muted) }
+                    Column(horizontalAlignment = Alignment.End) {
+                        TextButton(onClick = {
+                            VersionStore.delete(context, version.id)
+                            versions = VersionStore.all(context)
+                        }) { Text("Remove", color = Muted) }
+                        TextButton(
+                            enabled = !running,
+                            onClick = {
+                                running = true
+                                log = "running..."
+                                val apk = version.apk(context)
+                                val libs = File(File(context.filesDir, "versions"), "${version.id}/libs")
+                                Thread {
+                                    BoundaryProbe.runPhaseA(context.filesDir, apk, version.id, libs)
+                                    log = BoundaryLog.read(context.filesDir)
+                                    running = false
+                                }.start()
+                            },
+                        ) { Text("Run boundary check", color = Amber) }
+                    }
                 }
             }
         }
