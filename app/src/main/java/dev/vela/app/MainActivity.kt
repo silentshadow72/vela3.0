@@ -152,6 +152,32 @@ private fun VersionsScreen() {
         shape = RoundedCornerShape(10.dp),
     ) { Text("Import Minecraft APK", color = Amber) }
 
+    // Reachable whether or not a version is imported, so the check is never
+    // hidden behind a card that may not exist.
+    Spacer(Modifier.height(8.dp))
+    OutlinedButton(
+        enabled = !running,
+        onClick = {
+            val target = versions.maxByOrNull { it.importedAt }
+            if (target == null) {
+                status = "Import a Minecraft APK first - the check loads a library out of one."
+                log = ""
+            } else {
+                running = true
+                log = "running on ${target.packageName} ${target.versionName}..."
+                val apk = target.apk(context)
+                val libs = File(File(context.filesDir, "versions"), "${target.id}/libs")
+                Thread {
+                    BoundaryProbe.runPhaseA(context.filesDir, apk, target.id, libs)
+                    log = BoundaryLog.read(context.filesDir)
+                    running = false
+                }.start()
+            }
+        },
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(10.dp),
+    ) { Text(if (running) "Running..." else "Run boundary check", color = Amber) }
+
     if (status.isNotEmpty()) {
         Spacer(Modifier.height(8.dp))
         Text(status, color = Muted, fontSize = 13.sp)
