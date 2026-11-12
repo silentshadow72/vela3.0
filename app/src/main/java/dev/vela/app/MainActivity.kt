@@ -178,7 +178,21 @@ private fun VersionsScreen() {
 
     if (log.isNotEmpty()) {
         Spacer(Modifier.height(12.dp))
-        Text("Boundary log", color = Amber, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text("Boundary log", color = Amber, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+            TextButton(onClick = {
+                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE)
+                    as? android.content.ClipboardManager
+                clipboard?.setPrimaryClip(
+                    android.content.ClipData.newPlainText("Vela boundary log", log)
+                )
+                Toast.makeText(context, "Log copied", Toast.LENGTH_SHORT).show()
+            }) { Text("Copy", color = Amber) }
+        }
         Box(
             Modifier.fillMaxWidth().padding(top = 6.dp)
                 .background(Surface, RoundedCornerShape(10.dp)).padding(12.dp),
