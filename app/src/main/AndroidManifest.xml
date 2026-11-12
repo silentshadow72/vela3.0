@@ -8,6 +8,7 @@
     </queries>
 
     <application
+        android:name=".VelaApplication"
         android:allowBackup="false"
         android:label="Vela"
         android:supportsRtl="true"

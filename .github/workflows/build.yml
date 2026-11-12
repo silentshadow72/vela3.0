@@ -23,6 +23,12 @@ jobs:
         with:
           gradle-version: "8.13"
 
+      - name: Install NDK
+        run: |
+          set -euo pipefail
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "ndk;27.0.12077973" > /dev/null
+          echo "ndk installed at $ANDROID_HOME/ndk/27.0.12077973"
+
       - name: Unit tests
         run: gradle testDebugUnitTest --no-daemon --stacktrace
 

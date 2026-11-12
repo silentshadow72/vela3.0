@@ -72,7 +72,9 @@ private val VelaColors = darkColorScheme(
     onSurfaceVariant = Muted,
 )
 
-private enum class Tab(val label: String) { Versions("Versions"), Packs("Packs"), Launch("Launch") }
+private enum class Tab(val label: String) {
+    Versions("Versions"), Packs("Packs"), Launch("Launch"), Logs("Logs")
+}
 
 // ---- entry ----------------------------------------------------------------
 
@@ -112,6 +114,7 @@ private fun VelaApp() {
                     when (tab) {
                         Tab.Versions -> VersionsScreen()
                         Tab.Packs -> PacksScreen()
+                        Tab.Logs -> ReasonScreen()
                         Tab.Launch -> LaunchScreen()
                     }
                 }
@@ -536,6 +539,127 @@ private fun LaunchScreen() {
         Spacer(Modifier.height(10.dp))
         Text(message, color = Muted, fontSize = 13.sp)
     }
+}
+
+
+// ---- reason logs ----------------------------------------------------------
+
+@Composable
+private fun ReasonScreen() {
+    val context = LocalContext.current
+    var entries by remember { mutableStateOf(Reason.tail(context.filesDir, 200)) }
+    var showSelfTest by remember { mutableStateOf(false) }
+
+    Header("Reason logs", if (entries.isEmpty()) "nothing recorded yet" else "${entries.size} entries")
+
+    Row(Modifier.fillMaxWidth()) {
+        TextButton(onClick = {
+            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE)
+                as? android.content.ClipboardManager
+            clipboard?.setPrimaryClip(
+                android.content.ClipData.newPlainText("Vela reason log", Reason.allText(context.filesDir))
+            )
+            Toast.makeText(context, "Log copied", Toast.LENGTH_SHORT).show()
+        }) { Text("Copy", color = Amber) }
+
+        TextButton(onClick = {
+            val send = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                type = "text/plain"
+                putExtra(android.content.Intent.EXTRA_TEXT, Reason.allText(context.filesDir))
+            }
+            context.startActivity(android.content.Intent.createChooser(send, "Share reason log"))
+        }) { Text("Share", color = Amber) }
+
+        TextButton(onClick = { entries = Reason.tail(context.filesDir, 200) }) {
+            Text("Refresh", color = Amber)
+        }
+        // Self-test actions live behind a long press so they are not a stray tap.
+        TextButton(onClick = { showSelfTest = !showSelfTest }) {
+            Text(if (showSelfTest) "Hide self-test" else "Self-test", color = Muted)
+        }
+    }
+
+    if (showSelfTest) {
+        Card {
+            Column {
+                Text("Self-test", color = Text, fontWeight = FontWeight.Medium)
+                Text(
+                    "Each of these deliberately crashes the app. Reopen it afterwards: " +
+                        "the log should show the crash, and the last stage line before it " +
+                        "with conclusion pending.",
+                    color = Muted,
+                    fontSize = 13.sp,
+                )
+                TextButton(onClick = {
+                    Reason.stage(
+                        context.filesDir,
+                        question = "does the Java crash handler record a crash?",
+                        attempt = "throw deliberately",
+                    )
+                    throw IllegalStateException("Vela self-test: deliberate Java crash")
+                }) { Text("Crash in Java", color = Color(0xFFE06C5A)) }
+
+                TextButton(onClick = {
+                    Reason.stage(
+                        context.filesDir,
+                        question = "does the native handler record a signal?",
+                        attempt = "dereference null from native code",
+                    )
+                    ReasonSignal.crashForTest()
+                }) { Text("Crash in native code", color = Color(0xFFE06C5A)) }
+            }
+        }
+        Spacer(Modifier.height(10.dp))
+    }
+
+    if (entries.isEmpty()) {
+        EmptyState(
+            "Nothing recorded yet",
+            "Stages and crashes appear here. Entries are grouped by the question they " +
+                "were asking, so the log reads as experiments rather than events.",
+        )
+        return
+    }
+
+    LazyColumn(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        items(groupByQuestion(entries)) { group ->
+            Card {
+                Column {
+                    Text(group.first, color = Amber, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                    for (line in group.second) {
+                        Text(
+                            line,
+                            color = Text,
+                            fontSize = 10.sp,
+                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                            modifier = Modifier.padding(top = 2.dp),
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Groups raw JSON lines by their question, preserving order.
+ *
+ * Reading the question out of the JSON is deliberate: the log is the source of
+ * truth, and a viewer that quietly dropped unparseable lines would hide the very
+ * entries that matter after a crash.
+ */
+private fun groupByQuestion(lines: List<String>): List<Pair<String, List<String>>> {
+    val groups = LinkedHashMap<String, MutableList<String>>()
+    for (line in lines) {
+        val question = try {
+            val json = org.json.JSONObject(line)
+            json.optString("question").ifEmpty { "(no question)" }
+        } catch (t: Throwable) {
+            "(unparseable line)"
+        }
+        groups.getOrPut(question) { mutableListOf() }.add(line)
+    }
+    return groups.map { it.key to it.value.toList() }
 }
 
 // ---- pieces ---------------------------------------------------------------
