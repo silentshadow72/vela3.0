@@ -67,7 +67,7 @@ class ProfileRepository(private val root: File) {
     fun list(): List<Profile> {
         val index = readIndex()
         if (index != null) return index.profiles.sortedBy { it.createdAt }
-        return recover()
+        return recover().profiles.sortedBy { it.createdAt }
     }
 
     /** The active profile, or null when there are none. */
