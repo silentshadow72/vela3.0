@@ -36,6 +36,14 @@ android {
     buildFeatures {
         compose = true
     }
+
+    testOptions {
+        unitTests {
+            // org.json is part of Android, so the platform jar used for unit
+            // tests only has stubs. The real implementation is added below.
+            isReturnDefaultValues = true
+        }
+    }
 }
 
 dependencies {
@@ -45,4 +53,7 @@ dependencies {
     implementation("androidx.activity:activity-compose:1.9.3")
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.7")
+
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("org.json:json:20240303")
 }
