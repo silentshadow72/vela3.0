@@ -28,6 +28,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import java.io.File
+import androidx.compose.material3.Switch
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
@@ -66,7 +68,7 @@ private val VelaColors = darkColorScheme(
     onSurfaceVariant = Muted,
 )
 
-private enum class Tab(val label: String) { Versions("Versions"), Mods("Mods"), Launch("Launch") }
+private enum class Tab(val label: String) { Versions("Versions"), Packs("Packs"), Launch("Launch") }
 
 // ---- entry ----------------------------------------------------------------
 
@@ -105,7 +107,7 @@ private fun VelaApp() {
                 Column(Modifier.widthIn(max = 700.dp).fillMaxWidth().padding(20.dp)) {
                     when (tab) {
                         Tab.Versions -> VersionsScreen()
-                        Tab.Mods -> ModsScreen()
+                        Tab.Packs -> PacksScreen()
                         Tab.Launch -> LaunchScreen()
                     }
                 }
@@ -194,14 +196,150 @@ private fun VersionsScreen() {
 // ---- mods -----------------------------------------------------------------
 
 @Composable
-private fun ModsScreen() {
-    Header("Mods", "Not available yet")
-    EmptyState(
-        "No mod support in this build",
-        "Mod loading is not part of this milestone. Nothing here is a placeholder " +
-            "switch that pretends to work: when mod support exists, it will appear " +
-            "on this screen with the mods it can actually load.",
-    )
+private fun PacksScreen() {
+    val context = LocalContext.current
+    val profiles = remember { ProfileRepository(File(context.filesDir, "profiles")) }
+    val repo = remember { PackRepository(profiles) }
+
+    // The app needs somewhere to put packs, so a default profile is created on
+    // first use rather than showing an empty screen with no way forward.
+    val profile = remember {
+        profiles.active() ?: profiles.create("Main")
+    }
+
+    var packs by remember { mutableStateOf(repo.list(profile.id)) }
+    var status by remember { mutableStateOf("") }
+    var pendingDelete by remember { mutableStateOf<InstalledPack?>(null) }
+
+    fun refresh() {
+        packs = repo.list(profile.id)
+    }
+
+    val pickPack = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        status = "Importing..."
+        val work = File(context.cacheDir, "pack-import").also { it.mkdirs() }
+        val incoming = File(work, "incoming.mcpack")
+        val result = try {
+            context.contentResolver.openInputStream(uri)?.use { input ->
+                incoming.outputStream().use { output -> input.copyTo(output, 1 shl 20) }
+            }
+            PackImporter.import(incoming, repo.packsDir(profile.id), work)
+        } catch (t: Throwable) {
+            PackImportResult.Rejected("The import failed: ${t.message}")
+        } finally {
+            incoming.delete()
+        }
+
+        status = when (result) {
+            is PackImportResult.Imported -> "Imported ${result.manifest.name}"
+            is PackImportResult.Rejected -> result.reason
+        }
+        refresh()
+    }
+
+    Header("Packs", if (packs.isEmpty()) "No packs installed" else "${packs.size} installed")
+
+    OutlinedButton(
+        onClick = { pickPack.launch(arrayOf("application/zip", "application/octet-stream", "*/*")) },
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(10.dp),
+    ) { Text("Import a pack (.mcpack or .zip)", color = Amber) }
+
+    if (status.isNotEmpty()) {
+        Spacer(Modifier.height(8.dp))
+        Text(status, color = Muted, fontSize = 13.sp)
+    }
+
+    Spacer(Modifier.height(14.dp))
+
+    if (packs.isEmpty()) {
+        EmptyState(
+            "Nothing installed yet",
+            "Import a .mcpack or .zip. Vela reads its manifest and shows what the " +
+                "pack declares, so you can see whether it is what you expected.",
+        )
+    } else {
+        LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            items(packs) { pack ->
+                Card {
+                    Column {
+                        Row(
+                            Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Column(Modifier.weight(1f)) {
+                                Text(pack.displayName, color = Text, fontWeight = FontWeight.Medium)
+                                Text(
+                                    pack.versionLabel + " · " +
+                                        (pack.types.joinToString(", ").ifEmpty { "no modules" }),
+                                    color = Muted,
+                                    fontSize = 13.sp,
+                                )
+                            }
+                            Switch(
+                                checked = pack.enabled,
+                                onCheckedChange = { on ->
+                                    repo.setEnabled(profile.id, pack.uuid, on)
+                                    refresh()
+                                },
+                            )
+                        }
+
+                        if (pack.problem != null) {
+                            Text(pack.problem, color = Color(0xFFE06C5A), fontSize = 13.sp)
+                        } else if (pack.newerFormat) {
+                            Text(
+                                "This pack declares a newer format than this build understands.",
+                                color = Amber,
+                                fontSize = 13.sp,
+                            )
+                        }
+
+                        Row(Modifier.padding(top = 6.dp)) {
+                            TextButton(onClick = { pendingDelete = pack }) {
+                                Text("Delete", color = Muted)
+                            }
+                            Text(
+                                if (pack.enabled) "enabled" else "disabled",
+                                color = Muted,
+                                fontSize = 12.sp,
+                                modifier = Modifier.padding(top = 12.dp, start = 8.dp),
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    val toDelete = pendingDelete
+    if (toDelete != null) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { pendingDelete = null },
+            title = { Text("Delete ${toDelete.displayName}?") },
+            text = {
+                Text(
+                    "This removes the pack from this profile, including the copy kept " +
+                        "while it is disabled. It cannot be undone.",
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    repo.delete(profile.id, toDelete.uuid)
+                    pendingDelete = null
+                    refresh()
+                    status = "Deleted ${toDelete.displayName}"
+                }) { Text("Delete", color = Color(0xFFE06C5A)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingDelete = null }) { Text("Cancel", color = Muted) }
+            },
+        )
+    }
 }
 
 // ---- launch ---------------------------------------------------------------
