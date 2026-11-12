@@ -212,27 +212,34 @@ object BoundaryProbe {
 
 
     /**
-     * The step after Phase A: load the game library itself.
+     * Loads the game's libraries in a fixed order, each by absolute path.
      *
-     * Order matters. libc++_shared is loaded first so the C++ runtime is already
-     * in the process, then libminecraftpe is loaded. Two outcomes are expected
-     * and they mean different things:
+     * This is a search-path problem, not a missing-file problem: a dependency the
+     * game needs sits in the same directory, but loading the game by absolute path
+     * does not put that directory on the linker's search path. Loading each
+     * dependency first puts it in the process, where the linker then resolves it
+     * by soname.
      *
-     *   - a dependency resolution failure, where the linker cannot find
-     *     libfmod, libHttpClient or similar in this namespace
-     *   - a crash inside JNI_OnLoad, which is not catchable at all
-     *
-     * The line saying the load is about to happen is written and flushed before
-     * the call, so if the process dies the log still shows that it reached this
-     * point. That absence of a following line is itself the answer.
+     * Every step is written and flushed before its load, so if one of them kills
+     * the process the log shows exactly which.
      */
+    private val LOAD_ORDER = listOf(
+        "libc++_shared.so",
+        "libpairipcore.so",
+        "libfmod.so",
+        "libHttpClient.Android.so",
+        "libMediaDecoders_Android.so",
+        "libconscrypt_jni.so",
+        "libminecraftpe.so",
+    )
+
     fun runGameLibraryProbe(
         filesDir: File,
         packageManager: android.content.pm.PackageManager,
         packageName: String = "com.mojang.minecraftpe",
     ): Outcome {
         BoundaryLog.clear(filesDir)
-        BoundaryLog.line(filesDir, "== Probe: load the game library ==")
+        BoundaryLog.line(filesDir, "== Probe: load the game's libraries in order ==")
         BoundaryLog.line(filesDir, "package: $packageName")
         BoundaryLog.line(filesDir, "device ABIs: ${Build.SUPPORTED_ABIS.joinToString()}")
 
@@ -253,66 +260,70 @@ object BoundaryProbe {
         val libDir = File(libDirPath)
         BoundaryLog.line(filesDir, "nativeLibraryDir: $libDirPath")
 
-        val all = (libDir.listFiles { f -> f.isFile && f.name.endsWith(".so") } ?: emptyArray()).toList()
-        BoundaryLog.line(filesDir, "libraries present: ${all.size}")
-        for (f in all.sortedBy { it.name }) {
-            BoundaryLog.line(filesDir, "  ${f.name} (${f.length() / 1024} KB)")
+        val present = (libDir.listFiles { f -> f.isFile && f.name.endsWith(".so") } ?: emptyArray())
+            .associateBy { it.name }
+        BoundaryLog.line(filesDir, "libraries present: ${present.size}")
+        for (name in present.keys.sorted()) {
+            BoundaryLog.line(filesDir, "  $name (${present.getValue(name).length() / 1024} KB)")
         }
 
-        val runtime = all.firstOrNull { it.name == "libc++_shared.so" }
-        if (runtime != null) {
-            BoundaryLog.line(filesDir, "step 1: loading libc++_shared.so first")
-            try {
-                System.load(runtime.absolutePath)
-                BoundaryLog.line(filesDir, "step 1: OK - C++ runtime in the process")
-            } catch (e: UnsatisfiedLinkError) {
-                BoundaryLog.line(filesDir, "step 1: FAIL - ${e.message}")
-                logCauses(filesDir, e)
+        var loadedCount = 0
+        val absent = ArrayList<String>()
+        val failed = LinkedHashMap<String, String>()
+
+        for ((index, name) in LOAD_ORDER.withIndex()) {
+            val step = index + 1
+            val file = present[name]
+            if (file == null) {
+                BoundaryLog.line(filesDir, "step $step: $name - ABSENT from the directory, skipping")
+                absent.add(name)
+                continue
             }
-        } else {
-            BoundaryLog.line(filesDir, "step 1: no libc++_shared.so in that directory")
+            // Flushed before the load, so a fatal load leaves this as the last line.
+            BoundaryLog.line(filesDir, "step $step: loading $name (${file.length() / 1024} KB)")
+            BoundaryLog.line(filesDir, "step $step: path ${file.absolutePath}")
+            try {
+                System.load(file.absolutePath)
+                loadedCount++
+                BoundaryLog.line(filesDir, "step $step: OK - $name")
+            } catch (e: UnsatisfiedLinkError) {
+                val message = e.message ?: ""
+                BoundaryLog.line(filesDir, "step $step: FAIL - $name")
+                BoundaryLog.line(filesDir, "message: $message")
+                logCauses(filesDir, e)
+                failed[name] = message
+                BoundaryLog.line(filesDir, "step $step: stopping, the rest depend on this")
+                break
+            } catch (t: Throwable) {
+                BoundaryLog.line(filesDir, "step $step: FAIL - ${t.javaClass.simpleName}: ${t.message}")
+                failed[name] = t.message ?: t.javaClass.simpleName
+                break
+            }
         }
 
-        val game = all.firstOrNull { it.name == "libminecraftpe.so" }
-        if (game == null) {
-            BoundaryLog.line(filesDir, "RESULT: FAIL - libminecraftpe.so is not in the directory")
-            return Outcome(false, BoundaryLog.read(filesDir))
+        val gameLoaded = loadedCount > 0 && LOAD_ORDER.lastOrNull()
+            ?.let { it !in failed && it !in absent } == true
+
+        BoundaryLog.line(filesDir, "----")
+        BoundaryLog.line(filesDir, "loaded $loadedCount of ${LOAD_ORDER.size}")
+        if (absent.isNotEmpty()) {
+            BoundaryLog.line(filesDir, "absent: ${absent.joinToString()}")
+        }
+        if (failed.isNotEmpty()) {
+            for ((lib, reason) in failed) {
+                BoundaryLog.line(filesDir, "failed: $lib - $reason")
+            }
         }
 
-        BoundaryLog.line(filesDir, "step 2: about to load ${game.name} (${game.length() / 1024} KB)")
-        BoundaryLog.line(filesDir, "step 2: path ${game.absolutePath}")
-        // Flushed already by BoundaryLog.line. If the process dies inside the
-        // load, these two lines are the last thing on disk.
-
-        return try {
-            System.load(game.absolutePath)
+        return if (gameLoaded) {
             BoundaryLog.line(filesDir, "RESULT: OK - libminecraftpe.so loaded and JNI_OnLoad returned")
             Outcome(true, BoundaryLog.read(filesDir))
-        } catch (e: UnsatisfiedLinkError) {
-            val message = e.message ?: ""
-            BoundaryLog.line(filesDir, "RESULT: FAIL - UnsatisfiedLinkError")
-            BoundaryLog.line(filesDir, "message: $message")
-            BoundaryLog.line(filesDir, "ABI tried: ${deviceAbi()}")
-            logCauses(filesDir, e)
-            BoundaryLog.line(filesDir, "stack:")
-            e.stackTrace.take(16).forEach { BoundaryLog.line(filesDir, "  at $it") }
-
-            BoundaryLog.line(filesDir, "classification:")
-            when {
-                message.contains("not found", ignoreCase = true) ->
-                    BoundaryLog.line(filesDir, "  dependency resolution - a library it needs is not in this namespace")
-                message.contains("namespace", ignoreCase = true) ->
-                    BoundaryLog.line(filesDir, "  namespace restriction - the linker refused the path")
-                message.contains("JNI_OnLoad", ignoreCase = true) ||
-                    message.contains("Failed to invoke", ignoreCase = true) ->
-                    BoundaryLog.line(filesDir, "  JNI_OnLoad threw - the library loaded but its entry point failed")
-                else ->
-                    BoundaryLog.line(filesDir, "  unclassified - read the message above")
+        } else {
+            BoundaryLog.line(filesDir, "RESULT: FAIL - the game library did not load")
+            val missing = failed.keys.firstOrNull() ?: absent.firstOrNull()
+            if (missing != null) {
+                BoundaryLog.line(filesDir, "next to add or fix: $missing")
             }
-            Outcome(false, BoundaryLog.read(filesDir))
-        } catch (t: Throwable) {
-            BoundaryLog.line(filesDir, "RESULT: FAIL - ${t.javaClass.simpleName}: ${t.message}")
-            t.stackTrace.take(16).forEach { BoundaryLog.line(filesDir, "  at $it") }
             Outcome(false, BoundaryLog.read(filesDir))
         }
     }
