@@ -35,6 +35,7 @@ object GameClassProbe {
     fun run(filesDir: File, context: Context): BoundaryProbe.Outcome {
         BoundaryLog.clear(filesDir)
         BoundaryLog.line(filesDir, "== M3 Phase A: prove the context ==")
+        BoundaryLog.line(filesDir, "build: ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})")
         BoundaryLog.line(filesDir, "package: $GAME_PACKAGE")
         BoundaryLog.line(filesDir, "class wanted: $ACTIVITY_CLASS")
         BoundaryLog.line(filesDir, "device: ${Build.MANUFACTURER} ${Build.MODEL}, API ${Build.VERSION.SDK_INT}")
@@ -80,8 +81,12 @@ object GameClassProbe {
 
         if (packageContext != null) {
             BoundaryLog.line(filesDir, "route 1: context obtained")
+            // One line per call, flushed, so the last surviving line names the
+            // exact call that died rather than the block it was in.
+            BoundaryLog.line(filesDir, "call: packageContext.classLoader")
             val loader = packageContext.classLoader
             BoundaryLog.line(filesDir, "route 1: its classloader is ${loader.javaClass.name}")
+            BoundaryLog.line(filesDir, "call: Class.forName(initialise = false) via route 1 loader")
             try {
                 val clazz = Class.forName(ACTIVITY_CLASS, false, loader)
                 BoundaryLog.line(filesDir, "route 1: class found: ${clazz.name}")
@@ -117,6 +122,7 @@ object GameClassProbe {
             return BoundaryProbe.Outcome(false, BoundaryLog.read(filesDir))
         }
 
+        BoundaryLog.line(filesDir, "call: Class.forName(initialise = false) via route 2 loader")
         val clazz = try {
             Class.forName(ACTIVITY_CLASS, false, loader)
         } catch (t: Throwable) {
@@ -154,8 +160,8 @@ object GameClassProbe {
         BoundaryLog.line(filesDir, "static initialisers have NOT run yet (loaded with initialise = false)")
 
         // Flushed before the call, so a native abort leaves this as the last line.
-        BoundaryLog.line(filesDir, "stage: about to initialise the class")
-        BoundaryLog.line(filesDir, "stage: Class.forName(initialise = true) on ${loader.javaClass.name}")
+        BoundaryLog.line(filesDir, "call: Class.forName(initialise = true)")
+        BoundaryLog.line(filesDir, "call: loader is ${loader.javaClass.name}")
 
         return try {
             val initialised = Class.forName(ACTIVITY_CLASS, true, loader)

@@ -553,6 +553,11 @@ private fun Header(title: String, subtitle: String) {
     Column(Modifier.padding(bottom = 14.dp)) {
         Text(title, fontSize = 26.sp, fontWeight = FontWeight.SemiBold, color = Text)
         Text(subtitle, fontSize = 14.sp, color = Muted)
+        Text(
+            "build " + BuildConfig.VERSION_NAME + " (" + BuildConfig.VERSION_CODE + ")",
+            fontSize = 12.sp,
+            color = Muted,
+        )
     }
 }
 

@@ -46,6 +46,15 @@ jobs:
           echo "path=$APK" >> "$GITHUB_OUTPUT"
           ls -lh "$APK"
 
+      - name: Signing certificate
+        run: |
+          set -euo pipefail
+          APK=app/build/outputs/apk/debug/app-debug.apk
+          APKSIGNER=$(find "$ANDROID_HOME/build-tools" -name apksigner | sort -r | head -1)
+          echo "apksigner: $APKSIGNER"
+          "$APKSIGNER" verify --print-certs "$APK" | tee signing.txt
+          echo "::notice::APK signed with the certificate above"
+
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:

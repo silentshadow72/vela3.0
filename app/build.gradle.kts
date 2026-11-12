@@ -12,11 +12,28 @@ android {
         applicationId = "dev.vela.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 2
+        versionName = "0.7.2"
+    }
+
+    // A fixed debug keystore, committed to the repository.
+    //
+    // Android refuses to install an update signed by a different key, so a
+    // per-run generated debug keystore makes every build un-installable over the
+    // previous one. This key is a throwaway: it must never sign a release.
+    signingConfigs {
+        create("fixedDebug") {
+            storeFile = rootProject.file("ci/debug.keystore")
+            storePassword = "veladebug"
+            keyAlias = "veladebug"
+            keyPassword = "veladebug"
+        }
     }
 
     buildTypes {
+        debug {
+            signingConfig = signingConfigs.getByName("fixedDebug")
+        }
         release {
             isMinifyEnabled = false
         }
@@ -35,6 +52,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 
     testOptions {
