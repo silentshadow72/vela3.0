@@ -210,6 +210,7 @@ private fun PacksScreen() {
     var packs by remember { mutableStateOf(repo.list(profile.id)) }
     var status by remember { mutableStateOf("") }
     var pendingDelete by remember { mutableStateOf<InstalledPack?>(null) }
+    var expanded by remember { mutableStateOf<Set<String>>(emptySet()) }
 
     fun refresh() {
         packs = repo.list(profile.id)
@@ -300,6 +301,15 @@ private fun PacksScreen() {
                         }
 
                         Row(Modifier.padding(top = 6.dp)) {
+                            TextButton(onClick = {
+                                expanded = if (pack.uuid in expanded) expanded - pack.uuid
+                                else expanded + pack.uuid
+                            }) {
+                                Text(
+                                    if (pack.uuid in expanded) "Hide contents" else "What's inside",
+                                    color = Amber,
+                                )
+                            }
                             TextButton(onClick = { pendingDelete = pack }) {
                                 Text("Delete", color = Muted)
                             }
@@ -309,6 +319,33 @@ private fun PacksScreen() {
                                 fontSize = 12.sp,
                                 modifier = Modifier.padding(top = 12.dp, start = 8.dp),
                             )
+                        }
+
+                        if (pack.uuid in expanded) {
+                            val report = remember(pack.uuid, pack.directory.path) {
+                                PackIntegrity.report(pack.directory, pack.manifest, pack.problem)
+                            }
+                            Column(Modifier.padding(top = 6.dp)) {
+                                ReportLine("Modules", report.moduleTypes.joinToString(", ").ifEmpty { "none" })
+                                ReportLine(
+                                    "Textures",
+                                    when (report.textureCount) {
+                                        null -> "no textures/ folder"
+                                        0 -> "textures/ is empty"
+                                        else -> "${report.textureCount} files"
+                                    },
+                                )
+                                ReportLine("Files", "${report.fileCount} · ${report.sizeLabel()}")
+                                ReportLine("Version", report.version)
+                                for (note in report.notes) {
+                                    Text(
+                                        "· $note",
+                                        color = Muted,
+                                        fontSize = 12.sp,
+                                        modifier = Modifier.padding(top = 4.dp),
+                                    )
+                                }
+                            }
                         }
                     }
                 }
@@ -404,6 +441,14 @@ private fun LaunchScreen() {
 }
 
 // ---- pieces ---------------------------------------------------------------
+
+@Composable
+private fun ReportLine(label: String, value: String) {
+    Row(Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
+        Text(label, color = Muted, fontSize = 13.sp, modifier = Modifier.weight(1f))
+        Text(value, color = Text, fontSize = 13.sp)
+    }
+}
 
 @Composable
 private fun Header(title: String, subtitle: String) {
