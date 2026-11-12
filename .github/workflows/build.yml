@@ -23,11 +23,17 @@ jobs:
         with:
           gradle-version: "8.13"
 
-      - name: Install NDK
+      - name: Ensure an NDK is available
         run: |
           set -euo pipefail
-          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "ndk;27.0.12077973" > /dev/null
-          echo "ndk installed at $ANDROID_HOME/ndk/27.0.12077973"
+          echo "NDKs present:"
+          ls "$ANDROID_HOME/ndk" 2>/dev/null || echo "  none"
+          if [ ! -d "$ANDROID_HOME/ndk" ] || [ -z "$(ls -A "$ANDROID_HOME/ndk" 2>/dev/null)" ]; then
+            echo "installing one"
+            SDKM=$(command -v sdkmanager || echo "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager")
+            yes | "$SDKM" --install "ndk;27.0.12077973" > /dev/null
+            ls "$ANDROID_HOME/ndk"
+          fi
 
       - name: Unit tests
         run: gradle testDebugUnitTest --no-daemon --stacktrace
