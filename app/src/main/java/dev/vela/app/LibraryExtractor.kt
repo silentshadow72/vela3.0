@@ -79,6 +79,15 @@ object LibraryExtractor {
                     zip.getInputStream(entry).use { input ->
                         out.outputStream().use { output -> input.copyTo(output, 64 * 1024) }
                     }
+                    // The linker refuses to load a library the app can still write
+                    // to. Making it read-only is what allows the load at all, so a
+                    // failure here is reported rather than ignored.
+                    if (!out.setReadOnly()) {
+                        return ExtractionResult(
+                            abi, written.size, written.sorted(), available,
+                            "could not make $libName read-only, so it cannot be loaded",
+                        )
+                    }
                     written.add(libName)
                 }
             }
