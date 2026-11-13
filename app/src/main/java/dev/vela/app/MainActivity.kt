@@ -400,6 +400,9 @@ private fun PacksScreen() {
 
     Header("Packs", if (packs.isEmpty()) "No packs installed" else "${packs.size} installed")
 
+    ShaderPackSection()
+    Spacer(Modifier.height(16.dp))
+
     OutlinedButton(
         onClick = { pickPack.launch(arrayOf("application/zip", "application/octet-stream", "*/*")) },
         modifier = Modifier.fillMaxWidth(),
@@ -597,6 +600,66 @@ private fun LaunchScreen() {
     }
 }
 
+
+
+// ---- shader packs ---------------------------------------------------------
+
+@Composable
+private fun ShaderPackSection() {
+    val context = LocalContext.current
+    val location = remember { ShaderPacks.locate(context) }
+    var shaders by remember { mutableStateOf(ShaderPacks.list(location.folder)) }
+    var message by remember { mutableStateOf("") }
+
+    val pickZip = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        message = when (val result = ShaderPacks.import(context, uri, location.folder)) {
+            is ShaderPacks.Result.Imported -> "Imported ${result.pack.name}"
+            is ShaderPacks.Result.Rejected -> result.reason
+        }
+        shaders = ShaderPacks.list(location.folder)
+    }
+
+    Card {
+        Column {
+            Text("Shader packs", color = Text, fontWeight = FontWeight.Medium)
+            Text(
+                "Imported into the folder the mod scans: " + location.folder.path +
+                    " (from " + location.source + ")",
+                color = Muted,
+                fontSize = 12.sp,
+            )
+            TextButton(onClick = {
+                pickZip.launch(arrayOf("application/zip", "application/octet-stream", "*/*"))
+            }) { Text("Import shader pack (.zip)", color = Amber) }
+
+            if (message.isNotEmpty()) {
+                Text(message, color = Muted, fontSize = 13.sp)
+            }
+
+            if (shaders.isEmpty()) {
+                Text(
+                    "No shader packs yet. The mod rescans this folder, so an imported " +
+                        "pack appears in its own manager the next time it looks.",
+                    color = Muted,
+                    fontSize = 12.sp,
+                )
+            } else {
+                for (pack in shaders) {
+                    Text(
+                        "· " + pack.name + (if (pack.isZip) "" else "/ (folder)"),
+                        color = Text,
+                        fontSize = 12.sp,
+                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                        modifier = Modifier.padding(top = 3.dp),
+                    )
+                }
+            }
+        }
+    }
+}
 
 // ---- reason logs ----------------------------------------------------------
 

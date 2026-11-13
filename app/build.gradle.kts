@@ -12,8 +12,8 @@ android {
         applicationId = "dev.vela.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 5
-        versionName = "0.9.1"
+        versionCode = 6
+        versionName = "0.10.0"
     }
 
     // A fixed debug keystore, committed to the repository.
