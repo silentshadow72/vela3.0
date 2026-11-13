@@ -18,6 +18,9 @@ import java.util.Properties
  */
 object ShaderPacks {
 
+    // This is the folder the mod itself creates on disk, so it keeps its exact
+    // name: it is a functional identifier, not user-facing text. Renaming it
+    // would stop us finding the configuration the mod writes.
     private const val CONFIG_DIR = "IriOptic"
     private const val CONFIG_FILE = "settings.properties"
     private const val FOLDER_KEY = "shaderpacks"

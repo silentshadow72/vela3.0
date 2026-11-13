@@ -29,7 +29,7 @@ _ZN2pl7modmenu16unregisterModuleENSt6__ndk117basic_string_viewIcNS1_11char_trait
 _ZN2pl7modmenu19setConfigSchemaJsonENSt6__ndk117basic_string_viewIcNS1_11char_traitsIcEEEES5_E
 ```
 
-These are `pl::modmenu` — the **host's** mod-menu API. IriOptic *registers* its
+These are `pl::modmenu` — the **host's** mod-menu API. The Java shader pack *registers* its
 modules with the host and the host draws the menu. The mod does not own the menu,
 so there is nothing in the mod to open.
 
@@ -43,8 +43,8 @@ So a floating ball that calls into the mod to open a menu would call nothing.
 ## What the mod does watch
 
 ```
-/files/IriOptic
-/sdcard/games/IriOptic
+/files/<pack-id>
+/sdcard/games/<pack-id>
 /shaderpacks
 /settings.properties
 "Looks for new .zip files and folders in the shaderpacks folder."
@@ -53,7 +53,7 @@ So a floating ball that calls into the mod to open a menu would call nothing.
 ```
 
 - it scans a **`shaderpacks`** folder and rescans when it changes
-- it reads **`settings.properties`** in `/files/IriOptic`
+- it reads **`settings.properties`** in `/files/<pack-id>`
 - it can launch its own `OPEN_DOCUMENT` picker to import a `.zip`
 - the pause screen already has its full manager: "import .zip packs, options
   screens, settings"
