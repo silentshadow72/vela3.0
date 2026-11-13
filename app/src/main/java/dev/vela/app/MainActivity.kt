@@ -401,6 +401,8 @@ private fun PacksScreen() {
     Header("Packs", if (packs.isEmpty()) "No packs installed" else "${packs.size} installed")
 
     ShaderPackSection()
+    Spacer(Modifier.height(10.dp))
+    CreditLine()
     Spacer(Modifier.height(16.dp))
 
     OutlinedButton(
@@ -635,6 +637,16 @@ private fun ShaderPackSection() {
                 pickZip.launch(arrayOf("application/zip", "application/octet-stream", "*/*"))
             }) { Text("Import shader pack (.zip)", color = Amber) }
 
+            TextButton(onClick = {
+                // Never a button that does nothing: it either opens the menu the
+                // mod registered into, or it says the menu is not ready.
+                message = if (ModMenuBridge.openMenu()) {
+                    "Opening the shader menu"
+                } else {
+                    "Shader menu not ready: the mod menu ABI is not loaded in this build"
+                }
+            }) { Text("Open shader menu", color = Amber) }
+
             if (message.isNotEmpty()) {
                 Text(message, color = Muted, fontSize = 13.sp)
             }
@@ -789,6 +801,15 @@ private fun ReportLine(label: String, value: String) {
         Text(label, color = Muted, fontSize = 13.sp, modifier = Modifier.weight(1f))
         Text(value, color = Text, fontSize = 13.sp)
     }
+}
+
+@Composable
+private fun CreditLine() {
+    Text(
+        "Mod menu ABI: LiteLDev (preloader-android)",
+        color = Muted,
+        fontSize = 11.sp,
+    )
 }
 
 @Composable

@@ -55,6 +55,17 @@ class VelaApplication : Application() {
             // Delegate, so the system still reports it.
             previous?.uncaughtException(thread, throwable)
         }
+        val menuReady = ModMenuBridge.load()
+        Reason.result(
+            filesDir,
+            question = "is the mod menu ABI available?",
+            attempt = "load vela_modmenu and call into pl::modmenu",
+            observation = if (menuReady) "loaded" else "not loaded",
+            conclusion = if (menuReady)
+                "yes - the ball can open the menu the mod registers into"
+            else "no - the ball will report 'shader menu not ready' rather than do nothing",
+        )
+
         Reason.note(filesDir, "java crash handler installed")
     }
 }
