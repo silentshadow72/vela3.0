@@ -16,7 +16,7 @@ Names, manifests and authors are unchanged.
 
 | file | size | author (from manifest) | version |
 | --- | --- | --- | --- |
-| `JavaShadersOptifine.levipack` | 427 KB | anonymous, by request | 1.0.0 |
+| `JavaShadersOptifine.levipack` | 427 KB | — | 1.0.0 |
 | `VelaRender.levipack` | 636 KB | — | — |
 | `DynamicShadows.levipack` | 175 KB | chromehaert | 2.2.5 |
 | `CustomBuffers.levipack` | 34 KB | chromehaert | 1.1.1 |
@@ -44,8 +44,7 @@ They are carried across as the reference for Parts 3 and 4: what the overlay did
 how the importer copied packs, and how `shaders.properties` was parsed.
 
 ## Licensing, stated plainly
-The Java shader pack is third-party, bundled with permission and credited as
-"anonymous, by request". Its manifest carries that line.
+The Java shader pack is third-party and bundled with permission.
 VelaRender, VelaComposite, DynamicShadows and CustomBuffers are from vela2.0.
 Bundling them is what was asked for; publishing a derivative of any of them needs
 the author's permission. That has not changed since it was last raised.

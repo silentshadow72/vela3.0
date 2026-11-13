@@ -23,6 +23,7 @@ object ModMenuBridge {
     private external fun nativeCloseMenu()
     private external fun nativeSetModuleEnabled(moduleId: String, enabled: Boolean)
     private external fun nativeIsAvailable(): Boolean
+    private external fun nativeSetActivity(activity: android.app.Activity)
 
     fun load(): Boolean {
         return try {
@@ -38,6 +39,18 @@ object ModMenuBridge {
     }
 
     fun isAvailable(): Boolean = available
+
+    /** Hands the SDK the Activity it will call requestOpenModMenu() on. */
+    fun attach(activity: android.app.Activity): Boolean {
+        if (!available) return false
+        return try {
+            nativeSetActivity(activity)
+            true
+        } catch (t: Throwable) {
+            Log.w(TAG, "could not hand the activity to the ABI", t)
+            false
+        }
+    }
 
     /**
      * Opens the menu the mod registered into.

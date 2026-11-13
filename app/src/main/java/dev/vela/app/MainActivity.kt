@@ -805,6 +805,8 @@ private fun ReportLine(label: String, value: String) {
 
 @Composable
 private fun CreditLine() {
+    // LiteLDev asked to be credited for the mod menu ABI. The shader pack's
+    // author asked not to be mentioned at all, so there is no line for it.
     Text(
         "Mod menu ABI: LiteLDev (preloader-android)",
         color = Muted,
