@@ -14,6 +14,13 @@ android {
         targetSdk = 35
         versionCode = 7
         versionName = "0.11.0"
+
+        // The mod menu ABI ships GlossHook for these two only, and these are the
+        // ABIs real phones run. Building x86 too would fail the SDK's own check
+        // and double the APK for no one.
+        ndk {
+            abiFilters += listOf("arm64-v8a", "armeabi-v7a")
+        }
     }
 
     // A fixed debug keystore, committed to the repository.
