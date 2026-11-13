@@ -189,6 +189,27 @@ private fun VersionsScreen() {
                 question = "does Android create the declared game Activity?",
                 attempt = "startActivity(ComponentName(ourPackage, com.mojang.minecraftpe.MainActivity))",
             )
+            // Preload the game's libraries in order first, so the process already
+            // has what GameActivity.onCreate expects, then let Android create it.
+            Thread {
+                NativePreload.run(context, context.filesDir)
+                (context as? android.app.Activity)?.runOnUiThread {
+                    try {
+                        context.startActivity(
+                            android.content.Intent().apply {
+                                component = android.content.ComponentName(
+                                    context.packageName,
+                                    "com.mojang.minecraftpe.MainActivity",
+                                )
+                            }
+                        )
+                        status = "preloaded, then asked Android to create the game Activity"
+                    } catch (t: Throwable) {
+                        status = "could not start it: ${t.message}"
+                    }
+                }
+            }.start()
+            return@OutlinedButton
             val intent = android.content.Intent().apply {
                 component = android.content.ComponentName(
                     context.packageName,

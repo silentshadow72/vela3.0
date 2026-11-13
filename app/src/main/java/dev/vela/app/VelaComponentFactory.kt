@@ -76,74 +76,53 @@ class VelaComponentFactory : androidx.core.app.CoreComponentFactory() {
     }
 
     private fun buildGameActivity(parent: ClassLoader, filesDir: File?): Activity {
-        val context = ReasonFiles.app ?: error("application context not available")
-        val info = try {
-            @Suppress("DEPRECATION")
-            context.packageManager.getPackageInfo(GAME_PACKAGE, 0)
-        } catch (t: Throwable) {
-            throw IllegalStateException("$GAME_PACKAGE is not installed", t)
-        }
+        val built = GameLoader.build(ReasonFiles.app ?: error("no application context"), filesDir)
 
-        val sourceDir = info.applicationInfo?.sourceDir
-            ?: throw IllegalStateException("$GAME_PACKAGE has no sourceDir")
-        val nativeLibDir = info.applicationInfo?.nativeLibraryDir
-        val versionName = info.versionName
+        val clazz = built.gameClass ?: throw IllegalStateException(
+            built.error ?: "the game's Activity class could not be loaded"
+        )
 
         filesDir?.let {
             Reason.result(
                 it,
-                question = "where is the game?",
-                attempt = "getPackageInfo($GAME_PACKAGE)",
-                observation = "sourceDir=$sourceDir nativeLibraryDir=$nativeLibDir version=$versionName",
-                conclusion = "resolved",
-            )
-        }
-
-        // The library search path is the whole point of this loader: without it the
-        // game's static initialiser cannot resolve its own libraries.
-        filesDir?.let {
-            Reason.stage(
-                it,
-                question = "can the class be loaded with the game's library path?",
-                attempt = "new DexClassLoader(sourceDir, null, $nativeLibDir, ${parent.javaClass.name})",
-            )
-        }
-        val loader = Class.forName("dalvik.system.DexClassLoader")
-            .getConstructor(
-                String::class.java,
-                String::class.java,
-                String::class.java,
-                ClassLoader::class.java,
-            )
-            .newInstance(sourceDir, null, nativeLibDir, parent) as ClassLoader
-
-        filesDir?.let {
-            Reason.result(
-                it,
-                question = "can the class be loaded with the game's library path?",
-                attempt = "new DexClassLoader(...)",
-                observation = "loader built: ${loader.javaClass.name}",
-                conclusion = "loader ready, library path = $nativeLibDir",
-            )
-        }
-
-        // initialise = false. Phase A proved forcing it out of context aborts.
-        val clazz = Class.forName(GAME_ACTIVITY, false, loader)
-
-        filesDir?.let {
-            Reason.result(
-                it,
-                question = "does the class load without initialising?",
-                attempt = "Class.forName($GAME_ACTIVITY, initialise = false, dexLoader)",
-                observation = "loaded ${clazz.name}, superclass ${clazz.superclass?.name}",
-                conclusion = "yes - loading is safe; initialisation is left to Android",
+                question = "is the Activity class available to hand to Android?",
+                attempt = "Class.forName via the DexClassLoader",
+                observation = "loaded ${clazz.name} (superclass ${clazz.superclass?.name})",
+                conclusion = "yes - initialisation is left to Android, never forced",
             )
         }
 
         val constructor = clazz.getDeclaredConstructor()
         constructor.isAccessible = true
-        val instance = constructor.newInstance()
-        return instance as Activity
+
+        filesDir?.let {
+            Reason.stage(
+                it,
+                question = "does instantiating the Activity abort the process?",
+                attempt = "newInstance() on ${clazz.name}",
+            )
+        }
+
+        val instance = constructor.newInstance() as Activity
+
+        filesDir?.let {
+            Reason.result(
+                it,
+                question = "does instantiating the Activity abort the process?",
+                attempt = "newInstance() on ${clazz.name}",
+                observation = "instance created",
+                conclusion = "no - instantiation survives; onCreate is the next thing that can fail",
+            )
+            // Written immediately before we hand control back to Android, which
+            // will attach the activity and call onCreate. If nothing follows this
+            // line, onCreate either entered and died, or was never reached.
+            Reason.stage(
+                it,
+                question = "is GameActivity.onCreate reached?",
+                attempt = "return the instance to ActivityThread; it attaches and calls onCreate",
+            )
+        }
+        return instance
     }
 
     companion object {
