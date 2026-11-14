@@ -557,8 +557,8 @@ private fun LaunchScreen() {
     }
 
     Text(
-        "This opens the Minecraft installed on this device. It does not modify it, " +
-            "and no imported APK is used here.",
+        "This runs the game inside Vela's own process, so the preloads and the " +
+            "overlay apply. It does not open the installed app separately.",
         color = Muted,
         fontSize = 14.sp,
     )
@@ -567,22 +567,42 @@ private fun LaunchScreen() {
 
     Button(
         onClick = {
-            val intent = context.packageManager.getLaunchIntentForPackage(gamePackage)
-            if (intent == null) {
-                message = "Minecraft has no launchable activity on this device."
-            } else {
-                try {
-                    context.startActivity(intent)
-                    message = "Opened Minecraft"
-                } catch (t: Throwable) {
-                    message = "Could not open Minecraft: ${t.message}"
-                }
+            // Hosted only. Launching the installed game would run it outside this
+            // app, where the preloads, the isolation and the overlay do not apply,
+            // so that path is gone rather than kept as a fallback.
+            val resolution = HostedActivity.resolve(context)
+            if (!resolution.ok) {
+                message = resolution.reason ?: "The hosted Activity could not be resolved."
+                return@Button
             }
+            Thread {
+                NativePreload.run(context, context.filesDir)
+                (context as? android.app.Activity)?.runOnUiThread {
+                    val intent = android.content.Intent().apply {
+                        component = android.content.ComponentName(
+                            context.packageName,
+                            "com.mojang.minecraftpe.MainActivity",
+                        )
+                        addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                    android.util.Log.i(
+                        "VelaHost",
+                        "Launch tab startActivity component=" +
+                            (intent.component?.flattenToString() ?: "none"),
+                    )
+                    try {
+                        context.startActivity(intent)
+                        message = "starting " + (intent.component?.flattenToString() ?: "")
+                    } catch (t: Throwable) {
+                        message = "could not start it: ${t.javaClass.simpleName}: ${t.message}"
+                    }
+                }
+            }.start()
         },
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
         colors = ButtonDefaults.buttonColors(containerColor = Amber, contentColor = Ink),
-    ) { Text("Open Minecraft", fontWeight = FontWeight.SemiBold) }
+    ) { Text("Launch (hosted)", fontWeight = FontWeight.SemiBold) }
 
     if (message.isNotEmpty()) {
         Spacer(Modifier.height(10.dp))
