@@ -1,7 +1,6 @@
 package dev.vela.app
 
 import org.junit.Assert.assertTrue
-import org.junit.Assert.fail
 import org.junit.Test
 import java.io.File
 
@@ -15,15 +14,22 @@ import java.io.File
  */
 class BuildIdTest {
 
+    /** Unit tests run with the module as the working directory. */
+    private fun sourceRoot(): File {
+        val roots = listOf(File("src/main/java"), File("app/src/main/java"))
+        for (candidate in roots) {
+            if (candidate.isDirectory) return candidate
+        }
+        throw AssertionError("could not find the source root from ${File(".").absolutePath}")
+    }
+
     @Test
     fun `the version string appears in no source file`() {
         val version = BuildConfig.VERSION_NAME
         assertTrue("BuildConfig.VERSION_NAME is empty", version.isNotBlank())
 
         // Unit tests run with the module as the working directory.
-        val roots = listOf(File("src/main/java"), File("app/src/main/java"))
-        val sourceRoot = roots.firstOrNull { it.isDirectory }
-            ?: fail("could not find the source root from ${File(".").absolutePath}")!!
+        val sourceRoot = sourceRoot()
 
         val offenders = sourceRoot.walkTopDown()
             .filter { it.isFile && (it.name.endsWith(".kt") || it.name.endsWith(".java")) }
@@ -41,9 +47,7 @@ class BuildIdTest {
     @Test
     fun `the version code is not written into the source as a literal`() {
         val code = BuildConfig.VERSION_CODE.toString()
-        val roots = listOf(File("src/main/java"), File("app/src/main/java"))
-        val sourceRoot = roots.firstOrNull { it.isDirectory }
-            ?: fail("could not find the source root")!!
+        val sourceRoot = sourceRoot()
 
         val offenders = sourceRoot.walkTopDown()
             .filter { it.isFile && (it.name.endsWith(".kt") || it.name.endsWith(".java")) }
