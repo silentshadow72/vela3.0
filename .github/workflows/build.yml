@@ -58,6 +58,20 @@ jobs:
           echo "path=$APK" >> "$GITHUB_OUTPUT"
           ls -lh "$APK"
 
+      - name: Merged manifest check
+        run: |
+          set -euo pipefail
+          M=$(find app/build/intermediates -name AndroidManifest.xml -path "*merged*" | head -1)
+          echo "merged manifest: $M"
+          echo "--- hosted activity in the merged manifest:"
+          grep -n "com.mojang.minecraftpe.MainActivity" "$M" || echo "NOT PRESENT"
+          echo "--- package:"
+          grep -o 'package="[^"]*"' "$M" | head -1
+          if ! grep -q "com.mojang.minecraftpe.MainActivity" "$M"; then
+            echo "::error::the hosted activity is missing from the merged manifest"
+            exit 1
+          fi
+
       - name: Signing certificate
         run: |
           set -euo pipefail

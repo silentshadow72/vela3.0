@@ -189,49 +189,37 @@ private fun VersionsScreen() {
                 question = "does Android create the declared game Activity?",
                 attempt = "startActivity(ComponentName(ourPackage, com.mojang.minecraftpe.MainActivity))",
             )
-            // Preload the game's libraries in order first, so the process already
-            // has what GameActivity.onCreate expects, then let Android create it.
+            // Resolve first and report exactly what Android says. No fallback to
+            // the installed game: if the component is not ours, that is the answer.
+            val resolution = HostedActivity.resolve(context)
+            if (!resolution.ok) {
+                status = resolution.reason ?: "The hosted Activity could not be resolved."
+                return@OutlinedButton
+            }
+
             Thread {
                 NativePreload.run(context, context.filesDir)
                 (context as? android.app.Activity)?.runOnUiThread {
-                    try {
-                        context.startActivity(
-                            android.content.Intent().apply {
-                                component = android.content.ComponentName(
-                                    context.packageName,
-                                    "com.mojang.minecraftpe.MainActivity",
-                                )
-                            }
+                    val intent = android.content.Intent().apply {
+                        component = android.content.ComponentName(
+                            context.packageName,
+                            "com.mojang.minecraftpe.MainActivity",
                         )
-                        status = "preloaded, then asked Android to create the game Activity"
+                        addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                    android.util.Log.i(
+                        "VelaHost",
+                        "startActivity component=" + (intent.component?.flattenToString() ?: "none"),
+                    )
+                    try {
+                        context.startActivity(intent)
+                        status = "started " + (intent.component?.flattenToString() ?: "")
                     } catch (t: Throwable) {
-                        status = "could not start it: ${t.message}"
+                        status = "could not start it: ${t.javaClass.simpleName}: ${t.message}"
                     }
                 }
             }.start()
-            return@OutlinedButton
-            val intent = android.content.Intent().apply {
-                component = android.content.ComponentName(
-                    context.packageName,
-                    "com.mojang.minecraftpe.MainActivity",
-                )
-            }
-            try {
-                context.startActivity(intent)
-                status = "asked Android to create the game Activity - watch the Logs tab"
-            } catch (t: Throwable) {
-                Reason.result(
-                    context.filesDir,
-                    question = "does Android create the declared game Activity?",
-                    attempt = "startActivity(...)",
-                    observation = "${t.javaClass.name}: ${t.message}",
-                    conclusion = "no - the start itself was refused",
-                )
-                status = "could not start it: ${t.message}"
-            }
         },
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(10.dp),
     ) { Text("Host the game Activity", color = Amber) }
 
     Spacer(Modifier.height(8.dp))

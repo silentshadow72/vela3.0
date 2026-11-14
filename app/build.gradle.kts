@@ -12,8 +12,8 @@ android {
         applicationId = "dev.vela.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 7
-        versionName = "0.11.0"
+        versionCode = 8
+        versionName = "0.12.1"
 
         // The mod menu ABI ships GlossHook for these two only, and these are the
         // ABIs real phones run. Building x86 too would fail the SDK's own check
