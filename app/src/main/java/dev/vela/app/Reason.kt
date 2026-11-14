@@ -164,6 +164,43 @@ object Reason {
         current.renameTo(first)
     }
 
+    /**
+     * Marks the point where one build's entries end and another's begin.
+     *
+     * The log persists across installs, so without this an entry from an older
+     * build sits beside a newer one and the file looks like it is lying about
+     * which build produced it. This makes the boundary explicit instead of
+     * silently mixing them.
+     */
+    fun noteBuildTransition(filesDir: File) {
+        val previous = lastBuildId(filesDir)
+        if (previous == null || previous == buildId) return
+        write(
+            filesDir,
+            kind = "note",
+            question = "which build wrote these entries?",
+            attempt = "compare the last entry's buildId with this build",
+            observation = "last entry was $previous, this process is $buildId",
+            conclusion = "entries above $previous are from that build; everything below is $buildId",
+        )
+    }
+
+    /** The buildId of the most recent entry, or null when there is none. */
+    fun lastBuildId(filesDir: File): String? {
+        return try {
+            val f = currentFile(filesDir)
+            if (!f.isFile) return null
+            val lines = f.readLines()
+            val last = lines.lastOrNull { it.isNotBlank() } ?: return null
+            JSONObject(last).optString("buildId").ifEmpty { null }
+        } catch (t: Throwable) {
+            null
+        }
+    }
+
+    /** The build stamp this process is running, for display and for tests. */
+    fun currentBuildId(): String = buildId
+
     /** The last [lines] entries from current.log, oldest first. */
     fun tail(filesDir: File, lines: Int = 200): List<String> {
         return try {

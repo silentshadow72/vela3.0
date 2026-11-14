@@ -20,6 +20,7 @@ class VelaApplication : Application() {
         Reason.configure(BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE)
 
         val filesDir = filesDir
+        Reason.noteBuildTransition(filesDir)
         Reason.note(filesDir, "process started, pid ${android.os.Process.myPid()}")
 
         val signalsInstalled = ReasonSignal.install(filesDir)
